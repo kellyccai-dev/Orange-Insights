@@ -1,3 +1,10 @@
+import os
+try:
+    import plotly.express as px
+except ImportError:
+    os.system('pip install plotly')
+    import plotly.express as px
+    
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -104,5 +111,6 @@ with tab4:
     else:
         st.success("✅ **STANDARD OPERATIONS**")
         st.write("No weather factors currently disrupting the schedule.")
+
 
     st.button("Broadcast Instructions to Fleet")
