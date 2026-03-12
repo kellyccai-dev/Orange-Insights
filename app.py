@@ -16,7 +16,6 @@ import numpy as np
 st.set_page_config(page_title="Logistics Weather Command", page_icon="🛵", layout="wide")
 
 # --- INITIALIZE MEMORY (Session State) ---
-# This ensures the sliders have a default starting point
 if 'slider_hum' not in st.session_state:
     st.session_state.slider_hum = 75.0
 if 'slider_wind' not in st.session_state:
@@ -52,7 +51,7 @@ with tab1:
     c3.metric("Fleet Status", "Operational")
     
     fig = px.histogram(df, x="Humidity3pm", color="RainTomorrow", title="Rain Risk vs Humidity Factors")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch") # Updated width command
 
 with tab2:
     st.subheader("Zone Specific Data")
@@ -61,12 +60,12 @@ with tab2:
     zone_select = st.selectbox("Pick a District", df['Zone'].unique())
     filtered_df = df[df['Zone'] == zone_select].reset_index(drop=True)
     
-    # The interactive dataframe
+    # The interactive dataframe (FIXED HYPHEN AND WIDTH)
     selection_event = st.dataframe(
         filtered_df, 
-        use_container_width=True,
-        on_select="rerun",           # This tells Streamlit to update the app when a row is clicked
-        selection_mode="single_row"  # Only allow one row to be selected at a time
+        width="stretch", 
+        on_select="rerun",           
+        selection_mode="single-row"  # Changed from single_row to single-row
     )
     
     # If the user clicks a row, update the Predictor Sliders
@@ -77,4 +76,58 @@ with tab2:
         
         # Save to memory
         st.session_state.slider_hum = selected_hum
-        st.session_state.slider_wind = selected_
+        st.session_state.slider_wind = selected_wind
+        
+        st.success(f"✅ Data loaded! Go to the **Risk Predictor** tab to see the forecast for {selected_hum}% Humidity and {selected_wind} km/h Wind.")
+
+with tab3:
+    st.subheader("Run a Forecast Prediction")
+    st.write("Adjust the sliders manually, or click a row in the Drill-Down tab to auto-fill these.")
+    
+    user_hum = st.slider("Forecasted Humidity at 3 PM (%)", 0.0, 100.0, key="slider_hum")
+    user_wind = st.slider("Forecasted Wind Gust (km/h)", 0.0, 100.0, key="slider_wind")
+    
+    # Logic based on your Orange ML Decision Tree
+    if user_hum > 71:
+        current_risk = "HIGH RISK (RAIN)"
+        risk_color = "red"
+    elif user_hum > 55:
+        current_risk = "MODERATE RISK"
+        risk_color = "orange"
+    else:
+        current_risk = "LOW RISK (CLEAR)"
+        risk_color = "green"
+        
+    st.markdown(f"### Predicted Status: :{risk_color}[{current_risk}]")
+    st.session_state['predicted_risk'] = current_risk
+
+with tab4:
+    st.subheader("Managerial Action Plan")
+    
+    risk = st.session_state.get('predicted_risk', "No Prediction Run Yet")
+    
+    if risk == "HIGH RISK (RAIN)":
+        st.error("🚨 **CRITICAL: RAIN PROTOCOL ACTIVATED**")
+        st.markdown("""
+        - **Safety:** Dispatch rain ponchos and waterproof shoe covers to all riders.
+        - **Routing:** Suspend motorcycle deliveries in flood-prone North District.
+        - **Scheduling:** Call in 5 additional 'On-Call' backup drivers for the afternoon shift.
+        - **Customer:** Send automated 'Potential Delay' SMS to all customers.
+        """)
+    elif risk == "MODERATE RISK":
+        st.warning("⚠️ **CAUTION: MONITORING CONDITIONS**")
+        st.markdown("""
+        - **Safety:** Remind riders to carry standard rain gear.
+        - **Routing:** Standard routes, but avoid river-side shortcuts.
+        - **Scheduling:** No changes needed yet.
+        """)
+    elif risk == "LOW RISK (CLEAR)":
+        st.success("✅ **NORMAL OPERATIONS**")
+        st.markdown("""
+        - **Strategy:** Focus on maximum delivery volume. 
+        - **Riders:** Standard gear. No weather-related safety measures required.
+        """)
+    else:
+        st.info("Please go to the 'Risk Predictor' tab to set the weather conditions first.")
+
+    st.button("Broadcast Action Plan to Team")
