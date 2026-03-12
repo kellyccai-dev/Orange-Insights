@@ -1,116 +1,111 @@
 import os
+import sys
+
+# --- FORCED INSTALLATION HACK ---
+# This ensures plotly is installed even if the server hiccups
 try:
     import plotly.express as px
 except ImportError:
-    os.system('pip install plotly')
+    os.system(f"{sys.executable} -m pip install plotly")
     import plotly.express as px
-    
+
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
 
-# --- APP CONFIGURATION ---
-st.set_page_config(
-    page_title="LogiWeather City Dispatch",
-    page_icon="🛵",
-    layout="wide"
-)
+# --- PAGE CONFIG ---
+st.set_page_config(page_title="Logistics Weather Command", page_icon="🛵", layout="wide")
 
-# --- DATA ENGINE (Simulating your Orange ML Dataset) ---
+# --- SIMULATED DATA ---
 @st.cache_data
-def get_logistics_data():
+def get_data():
     np.random.seed(42)
-    rows = 500
-    zones = ['North District', 'South District', 'East Port', 'West Hills']
-    vehicles = ['Motorcycle', 'Cargo Van', 'Bicycle']
-    
-    # Logic derived from your Orange Decision Tree: Humidity3pm is the main driver
-    rain_tomorrow = np.random.choice(['Yes', 'No'], size=rows, p=[0.3, 0.7])
-    hum_3pm = [np.random.normal(75, 10) if r == 'Yes' else np.random.normal(45, 12) for r in rain_tomorrow]
-    
     df = pd.DataFrame({
-        'Zone': np.random.choice(zones, rows),
-        'Vehicle': np.random.choice(vehicles, rows, p=[0.6, 0.3, 0.1]),
-        'Humidity3pm': np.clip(hum_3pm, 15, 100),
-        'RainTomorrow': rain_tomorrow,
-        'WindGustSpeed': np.random.randint(20, 80, size=rows)
+        'Zone': np.random.choice(['North District', 'South District', 'East Port', 'West Hills'], 500),
+        'Humidity3pm': np.random.randint(20, 95, 500),
+        'WindGustSpeed': np.random.randint(10, 80, 500),
     })
-    
-    # Business metrics
-    df['Delay_Risk_Mins'] = np.where(df['RainTomorrow'] == 'Yes', np.random.randint(30, 90), np.random.randint(0, 15))
+    # Rain logic based on your Orange chart: Humidity > 71
+    df['RainTomorrow'] = np.where(df['Humidity3pm'] > 71, 'Yes', 'No')
     return df
 
-df = get_logistics_data()
+df = get_data()
 
-# --- UI HEADER ---
-st.title("🛵 LogiWeather Command Center")
-st.markdown("### *Data-Driven Dispatch & Rider Safety*")
-st.divider()
+# --- APP LOGIC ---
+st.title("🛵 LogiWeather City Dispatch")
+st.markdown("### *Predictive Operations & Rider Safety*")
 
-# --- NAVIGATION ---
-# Optimized for mobile (tabs instead of a deep sidebar)
+# Use Tabs for a clean mobile/PC UI
 tab1, tab2, tab3, tab4 = st.tabs(["📊 Dashboard", "🔍 Drill-Down", "🔮 Risk Predictor", "📋 Action Plan"])
 
-# --- TAB 1: DASHBOARD ---
 with tab1:
-    col1, col2, col3 = st.columns(3)
+    st.subheader("Current Fleet KPIs")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("High-Risk Zones", len(df[df['RainTomorrow']=='Yes']))
+    c2.metric("Avg. Humidity", f"{df['Humidity3pm'].mean():.1f}%")
+    c3.metric("Fleet Status", "Operational")
     
-    # KPIs based on your ML data
-    high_risk_count = len(df[df['Humidity3pm'] > 71])
-    col1.metric("High-Risk Routes", f"{high_risk_count}", "Weather Warning")
-    col2.metric("Avg. Humidity Today", f"{df['Humidity3pm'].mean():.1f}%")
-    col3.metric("Fleet Readiness", "88%", "-2% vs Yesterday")
-    
-    st.subheader("Delay Risk by City Zone")
-    fig = px.bar(df, x='Zone', y='Delay_Risk_Mins', color='RainTomorrow', 
-                 barmode='group', color_discrete_map={'Yes': '#ef553b', 'No': '#00cc96'})
+    fig = px.histogram(df, x="Humidity3pm", color="RainTomorrow", title="Rain Risk vs Humidity Factors")
     st.plotly_chart(fig, use_container_width=True)
 
-# --- TAB 2: DRILL-DOWN ---
 with tab2:
-    st.subheader("Filter Active Shipments")
-    selected_zone = st.selectbox("Select Zone to Inspect", df['Zone'].unique())
-    filtered = df[df['Zone'] == selected_zone]
-    
-    st.dataframe(filtered[['Vehicle', 'Humidity3pm', 'RainTomorrow', 'Delay_Risk_Mins']], 
-                 use_container_width=True, hide_index=True)
+    st.subheader("Zone Specific Data")
+    zone_select = st.selectbox("Pick a District", df['Zone'].unique())
+    st.dataframe(df[df['Zone'] == zone_select], use_container_width=True)
 
-# --- TAB 3: RISK PREDICTOR ---
 with tab3:
-    st.subheader("Tomorrow's Weather Input")
-    st.info("Based on your ML Model: Humidity at 3 PM is the strongest factor for rain.")
+    st.subheader("Run a Forecast Prediction")
+    st.write("Input tomorrow's expected weather factors to generate the plan.")
     
-    c1, c2 = st.columns(2)
-    with c1:
-        in_hum = st.slider("Forecasted Humidity @ 3pm (%)", 0, 100, 72)
-        in_wind = st.slider("Wind Gust Speed (km/h)", 0, 100, 45)
+    # Input sliders
+    user_hum = st.slider("Forecasted Humidity at 3 PM (%)", 0, 100, 75)
+    user_wind = st.slider("Forecasted Wind Gust (km/h)", 0, 100, 40)
     
-    with c2:
-        # Implementing the specific Logic from your Orange Image
-        if in_hum > 71:
-            st.error("### prediction: RAIN LIKELY")
-            st.warning("Factor Triggered: Humidity > 71%")
-            st.metric("Estimated Delay", "+60-90 Mins")
-        else:
-            st.success("### prediction: NO RAIN")
-            st.metric("Estimated Delay", "0-10 Mins")
+    # Logic based on your Orange ML Decision Tree
+    if user_hum > 71:
+        current_risk = "HIGH RISK (RAIN)"
+        risk_color = "red"
+    elif user_hum > 55:
+        current_risk = "MODERATE RISK"
+        risk_color = "orange"
+    else:
+        current_risk = "LOW RISK (CLEAR)"
+        risk_color = "green"
+        
+    st.markdown(f"### Predicted Status: :{risk_color}[{current_risk}]")
+    
+    # SAVE TO SESSION STATE so Tab 4 can see it
+    st.session_state['predicted_risk'] = current_risk
+    st.session_state['predicted_hum'] = user_hum
 
-# --- TAB 4: ACTION PLAN ---
 with tab4:
-    st.subheader("Managerial Directives")
+    st.subheader("Managerial Action Plan")
     
-    # Dynamic recommendations based on the data
-    if df['Humidity3pm'].mean() > 65:
-        st.error("🚨 **CRITICAL ACTION REQUIRED**")
+    # Get the risk from the Predictor tab
+    risk = st.session_state.get('predicted_risk', "No Prediction Run Yet")
+    
+    if risk == "HIGH RISK (RAIN)":
+        st.error("🚨 **CRITICAL: RAIN PROTOCOL ACTIVATED**")
         st.markdown("""
-        1. **Rider Gear:** Issue raincoats and waterproof parcel covers to all motorcycle riders.
-        2. **Rerouting:** Divert North District e-bikes to West Hills to avoid flood zones.
-        3. **Customer Alert:** Trigger 'Weather Delay' SMS to all pending deliveries.
+        - **Safety:** Dispatch rain ponchos and waterproof shoe covers to all riders.
+        - **Routing:** Suspend motorcycle deliveries in flood-prone North District.
+        - **Scheduling:** Call in 5 additional 'On-Call' backup drivers for the afternoon shift.
+        - **Customer:** Send automated 'Potential Delay' SMS to all customers.
+        """)
+    elif risk == "MODERATE RISK":
+        st.warning("⚠️ **CAUTION: MONITORING CONDITIONS**")
+        st.markdown("""
+        - **Safety:** Remind riders to carry standard rain gear.
+        - **Routing:** Standard routes, but avoid river-side shortcuts.
+        - **Scheduling:** No changes needed yet.
+        """)
+    elif risk == "LOW RISK (CLEAR)":
+        st.success("✅ **NORMAL OPERATIONS**")
+        st.markdown("""
+        - **Strategy:** Focus on maximum delivery volume. 
+        - **Riders:** Standard gear. No weather-related safety measures required.
         """)
     else:
-        st.success("✅ **STANDARD OPERATIONS**")
-        st.write("No weather factors currently disrupting the schedule.")
+        st.info("Please go to the 'Risk Predictor' tab to set the weather conditions first.")
 
-
-    st.button("Broadcast Instructions to Fleet")
+    st.button("Broadcast Action Plan to Team")
